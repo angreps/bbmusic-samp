@@ -34,6 +34,38 @@ Package ini menyediakan **3D Spatial Boombox Radio System** dan **Pustaka Musik 
 
 ---
 
+## 🔄 Alur Sistem & Arsitektur (Flowchart)
+
+```mermaid
+flowchart TD
+    subgraph ClientSide ["In-Game SA-MP Player"]
+        P1["Pemain (/boombox)"] --> D1["Dialog GUI Menu"]
+        D1 -->|"1. Pasang Boombox"| OBJ["Spawn Objek 2226 di Depan Karakter"]
+        D1 -->|"2. Pilih Lagu (Web / Library / Custom)"| AUD["Trigger Audio Stream"]
+        D1 -->|"3. Atur Jarak"| RAD["Radius Suara (10m - 75m)"]
+    end
+
+    subgraph ScriptLogic ["Pawn Script & FilterScript (bbmusic.inc / bbmusic_boombox.pwn)"]
+        AUD --> PL["Boombox_Play(playerid, songIdOrUrl, radius)"]
+        OBJ --> ST["Boombox_Place(playerid)"]
+        D1 -->|"Sinkronisasi Web"| HTTP["BBMusic_SyncWithWeb() (a_http.inc / HTTP_GET)"]
+        TMR["Timer Realtime (SetTimer 1000ms)"] --> DIST["Dynamic Listener Tracker (Pindai Pemain Sekitar)"]
+    end
+
+    subgraph WebAPI ["BBMusic API Cloud (bbmusic.biz.id)"]
+        HTTP -->|"HTTP GET /api/samp/tracks"| ENDP["API Endpoint SA-MP (/api/samp/tracks)"]
+        ENDP -->|"Response: trackId|title|artist"| HTTP
+    end
+
+    subgraph AudioPlayback ["GTA SA-MP Engine (Bass.dll)"]
+        PL --> STREAM["PlayAudioStreamForPlayer()"]
+        DIST -->|"Pemain masuk ke radius boombox"| STREAM
+        STREAM -->|"Direct Stream MP3 (HTTP Range 206)"| BASS["3D Spatial Audio Playback (Suara Memudar Sesuai Jarak)"]
+    end
+```
+
+---
+
 ## 📁 Struktur Repository
 
 ```text
