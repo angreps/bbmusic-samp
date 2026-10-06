@@ -1,0 +1,8 @@
+# Compiled files (keep .amx in release if desired)
+*.bak
+*.tmp
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
