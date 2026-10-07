@@ -24,7 +24,10 @@
 */
 
 #include <a_samp>
-#include <a_http>
+
+#if !defined BBMUSIC_NO_HTTP
+    #tryinclude <a_http>
+#endif
 
 // ================= KONFIGURASI =================
 #if !defined BBMUSIC_BASE_STREAM_URL
@@ -191,11 +194,21 @@ stock BBMusic_ParseWebTracks(const data[]) {
 
 // Menjalankan permintaan sinkronisasi HTTP ke website
 stock BBMusic_SyncWithWeb(playerid = -1) {
+#if defined HTTP_GET
     if (playerid != -1 && IsPlayerConnected(playerid)) {
         SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] Menghubungkan ke web bbmusic.biz.id untuk mengambil lagu terbaru...");
     }
     HTTP(playerid, HTTP_GET, BBMUSIC_API_SYNC_HOST, "", "OnBBMusicHttpSync");
     return 1;
+#else
+    #pragma unused playerid
+    printf("[BBMusic] a_http.inc tidak terpasang di compiler. Sinkronisasi web dilewati.");
+    if (playerid != -1 && IsPlayerConnected(playerid)) {
+        SendClientMessage(playerid, 0xFFA500AA, "[BBMusic] Fitur web sync dilewati (a_http.inc tidak terpasang). Menggunakan library offline...");
+        BBMusic_ShowOfflineLibrary(playerid);
+    }
+    return 0;
+#endif
 }
 
 // Callback respon HTTP dari website
@@ -358,24 +371,45 @@ stock BBMusic_InitOfflineLibrary(playerid = -1) {
         return count;
     }
 
-    // File tidak ditemukan di hosting -> Download otomatis 10 lagu dari web bbmusic.biz.id
-    printf("[BBMusic] File %s belum ada di hosting! Otomatis mendownload 10 lagu dari web bbmusic.biz.id...", BBMUSIC_OFFLINE_FILE);
-    if (playerid != -1 && IsPlayerConnected(playerid)) {
-        SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] File library offline belum ada di hosting. Mengunduh 10 lagu dari web...");
-    }
+    #if defined HTTP_GET
+        // File tidak ditemukan di hosting -> Download otomatis 10 lagu dari web bbmusic.biz.id
+        printf("[BBMusic] File %s belum ada di hosting! Otomatis mendownload 10 lagu dari web bbmusic.biz.id...", BBMUSIC_OFFLINE_FILE);
+        if (playerid != -1 && IsPlayerConnected(playerid)) {
+            SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] File library offline belum ada di hosting. Mengunduh 10 lagu dari web...");
+        }
 
-    HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
-    return 1;
+        HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
+        return 1;
+    #else
+        // a_http.inc tidak ada -> Otomatis buat file 10 lagu offline default di hosting
+        printf("[BBMusic] File %s belum ada & a_http.inc tidak terpasang. Menulis 10 lagu offline default ke hosting...", BBMUSIC_OFFLINE_FILE);
+        new count = BBMusic_WriteDefaultOffline();
+        BBMusic_LoadOfflineTracks();
+        printf("[BBMusic] Sukses membuat scriptfiles/%s dengan %d lagu default.", BBMUSIC_OFFLINE_FILE, count);
+        if (playerid != -1 && IsPlayerConnected(playerid)) {
+            SendClientMessage(playerid, 0x00FF7FAA, "[BBMusic] 10 lagu offline default berhasil disimpan ke hosting!");
+        }
+        return count;
+    #endif
 }
 
 // Download ulang / paksa perbarui 10 lagu offline dari web
 stock BBMusic_DownloadOffline(playerid = -1) {
-    printf("[BBMusic] Mengunduh ulang 10 lagu dari bbmusic.biz.id ke hosting (scriptfiles/%s)...", BBMUSIC_OFFLINE_FILE);
-    if (playerid != -1 && IsPlayerConnected(playerid)) {
-        SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] Mengunduh 10 lagu offline dari web untuk disimpan di hosting...");
-    }
-    HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
-    return 1;
+    #if defined HTTP_GET
+        printf("[BBMusic] Mengunduh ulang 10 lagu dari bbmusic.biz.id ke hosting (scriptfiles/%s)...", BBMUSIC_OFFLINE_FILE);
+        if (playerid != -1 && IsPlayerConnected(playerid)) {
+            SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] Mengunduh 10 lagu offline dari web untuk disimpan di hosting...");
+        }
+        HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
+        return 1;
+    #else
+        #pragma unused playerid
+        printf("[BBMusic] Tidak dapat mengunduh ulang dari web (a_http.inc tidak terpasang di compiler).");
+        if (playerid != -1 && IsPlayerConnected(playerid)) {
+            SendClientMessage(playerid, 0xFFA500AA, "[BBMusic] a_http.inc tidak tersedia di compiler gamemode/filterscript.");
+        }
+        return 0;
+    #endif
 }
 
 // Callback respon HTTP saat mengunduh 10 lagu offline
