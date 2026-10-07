@@ -24,7 +24,7 @@ Package ini menyediakan **3D Spatial Boombox Radio System** dan **Pustaka Musik 
    - Pemain lain yang baru berjalan/berkendara mendekati boombox otomatis mendengarkan musik yang sedang berputar tanpa perlu relog!
 6. **🎵 Pustaka Lagu Lengkap & Custom Input:**
    - **Lagu Realtime Website:** Lagu terbaru hasil convert pengguna di `bbmusic.biz.id`.
-   - **Library Bawaan Server:** Pop Indo, DJ Remix & Thai Edit, Dangdut Koplo, Phonk & Drift, Hits Barat, Lofi.
+   - **Library Offline Otomatis di Hosting:** Server otomatis mendeteksi file `scriptfiles/bbmusic_offline.txt`. Jika belum ada, hosting otomatis mendownload 10 lagu dari web dan menyimpannya di hosting server sebagai library offline permanen!
    - **Input Kustom:** Pemain bisa memasukkan Track ID hasil convert di web (contoh: `9941e16205`) atau link stream MP3 langsung.
 7. **🛠️ Dialog GUI Responsif (`/boombox`):**
    - Menaruh boombox di tanah dengan animasi.
@@ -145,7 +145,7 @@ Jika server SA-MP Anda menggunakan plugin `samp-node`:
 ### Pilihan Menu:
 - **1. [PASANG / AMBIL] Boombox:** Meletakkan atau mengambil kembali radio boombox.
 - **2. [WEB] Lagu Terbaru dari Website:** Menampilkan lagu realtime yang baru saja di-convert di web.
-- **3. [OFFLINE] Library Lagu Bawaan:** Memilih lagu offline bawaan server.
+- **3. [OFFLINE] Library Lagu Offline Hosting:** Memilih 10 lagu yang tersimpan di file hosting (`scriptfiles/bbmusic_offline.txt`).
 - **4. [CUSTOM] Input Track ID / Link:** Memasukkan ID lagu dari web `bbmusic.biz.id`.
 - **5. [SYNC] Sinkronisasi Ulang:** Memaksa server memperbarui daftar lagu dari website.
 - **6. [RADIUS] Atur Jarak Suara:** Mengubah jarak radius musik (10 meter - 75 meter).
@@ -176,6 +176,12 @@ Boombox_ShowMenu(playerid);
 
 // Sinkronisasi manual dengan website bbmusic.biz.id
 BBMusic_SyncWithWeb(playerid);
+
+// Inisialisasi / cek file offline di hosting (auto-download jika file belum ada)
+BBMusic_InitOfflineLibrary(playerid = -1);
+
+// Paksa unduh ulang 10 lagu offline dari web ke hosting
+BBMusic_DownloadOffline(playerid = -1);
 ```
 
 ---

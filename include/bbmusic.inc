@@ -10,13 +10,16 @@
                       Powered by BBMusic Web (bbmusic.biz.id)
     ============================================================================
     Fitur Utama:
-    - Realtime Web Sync: Sinkronisasi otomatis dengan lagu terbaru dari web
-    - 3D Spatial Audio Stream untuk Boombox (Objek 2226)
-    - Dynamic Sync: Pemain yang mendekat otomatis mendengar musik realtime
-    - Bebas Emoji: 100% kompatibel dengan font font SA-MP DirectX (Codepage 1252)
-    - Input Custom ID / Link Langsung dari bbmusic.biz.id
-    - Dialog GUI Interaktif (/boombox)
-    - Kompatibel dengan semua Gamemode & Filterscript (ALS Hooked)
+    - Auto-Download Offline Library: Jika file scriptfiles/bbmusic_offline.txt
+      tidak ada di hosting, server otomatis mendownload 10 lagu dari web
+      bbmusic.biz.id dan menyimpannya di hosting sebagai library offline.
+    - Realtime Web Sync: Sinkronisasi otomatis dengan lagu terbaru dari web.
+    - 3D Spatial Audio Stream untuk Boombox (Objek 2226).
+    - Dynamic Sync: Pemain yang mendekat otomatis mendengar musik realtime.
+    - Bebas Emoji: 100% kompatibel dengan font font SA-MP DirectX (Codepage 1252).
+    - Input Custom ID / Link Langsung dari bbmusic.biz.id.
+    - Dialog GUI Interaktif (/boombox).
+    - Kompatibel dengan semua Gamemode & Filterscript (ALS Hooked).
     ============================================================================
 */
 
@@ -30,6 +33,18 @@
 
 #if !defined BBMUSIC_API_SYNC_HOST
     #define BBMUSIC_API_SYNC_HOST "bbmusic.biz.id/api/samp/tracks"
+#endif
+
+#if !defined BBMUSIC_API_OFFLINE_HOST
+    #define BBMUSIC_API_OFFLINE_HOST "bbmusic.biz.id/api/samp/tracks?limit=10"
+#endif
+
+#if !defined BBMUSIC_OFFLINE_FILE
+    #define BBMUSIC_OFFLINE_FILE "bbmusic_offline.txt"
+#endif
+
+#if !defined MAX_BBMUSIC_OFFLINE_TRACKS
+    #define MAX_BBMUSIC_OFFLINE_TRACKS 10
 #endif
 
 #if !defined BBMUSIC_BOOMBOX_MODEL
@@ -51,69 +66,40 @@
 enum {
     DIALOG_BBMUSIC_MAIN = DIALOG_BBMUSIC_BASE,
     DIALOG_BBMUSIC_WEB_SONGS,
-    DIALOG_BBMUSIC_CATEGORIES,
     DIALOG_BBMUSIC_OFFLINE_SONGS,
     DIALOG_BBMUSIC_CUSTOM,
     DIALOG_BBMUSIC_RADIUS
 };
 
 // ================= STRUKTUR DATA =================
-enum E_BBMUSIC_SONG {
-    E_SONG_CATEGORY[24],
-    E_SONG_TITLE[48],
-    E_SONG_ARTIST[32],
-    E_SONG_ID[64]
-};
-
-// Koleksi Library Musik Bawaan Offline (Fallback jika server tidak terhubung internet)
-new const g_BBMusicOfflineLibrary[][E_BBMUSIC_SONG] = {
-    // 1. Pop & Galau Indonesia
-    {"Pop Indo", "Bergema Sampai Selamanya", "Nadhif Basalamah", "461800b227"},
-    {"Pop Indo", "Komang", "Raim Laode", "komang_samp"},
-    {"Pop Indo", "Sial", "Mahalini", "sial_mahalini"},
-    {"Pop Indo", "Tak Segampang Itu", "Anggi Marito", "tak_segampang_itu"},
-    {"Pop Indo", "Jiwa Yang Bersedih", "Ghea Indrawari", "jiwa_bersedih"},
-
-    // 2. DJ Remix & Jedag-Jedug (Thai Edit)
-    {"DJ Remix", "Rasa Ini (Thailand Edit)", "Vierra ft. 0landrys", "9941e16205"},
-    {"DJ Remix", "Astaga Bercanda (Thai Edit)", "Akbar Chalay & Mingse", "f47889dec4"},
-    {"DJ Remix", "DJ Kuda Yang Mana", "DJ Desa", "dj_kuda_yang_mana"},
-    {"DJ Remix", "DJ Santuy Bass Glerr", "DJ Opus", "dj_santuy_bass"},
-
-    // 3. Dangdut & Koplo Jawa
-    {"Dangdut Koplo", "Nemen", "Gildcoustic", "nemen_koplo"},
-    {"Dangdut Koplo", "Rungkad", "Happy Asmara", "rungkad_koplo"},
-    {"Dangdut Koplo", "Dumes", "Woro Widowati", "dumes_koplo"},
-    {"Dangdut Koplo", "Sanes", "Guyon Waton ft Denny", "sanes_koplo"},
-
-    // 4. Phonk & Drift Vibes
-    {"Phonk & Drift", "Murder In My Mind", "KORDHELL", "murder_in_my_mind"},
-    {"Phonk & Drift", "Metamorphosis", "INTERWORLD", "metamorphosis_phonk"},
-    {"Phonk & Drift", "Sahara", "Hensonn", "sahara_phonk"},
-    {"Phonk & Drift", "Montagem Orquestra", "DJ Tenebroso", "montagem_orquestra"},
-
-    // 5. Pop Global / Hits Barat
-    {"Pop Global", "Never Gonna Give You Up", "Rick Astley", "rick_astley"},
-    {"Pop Global", "Starboy", "The Weeknd ft. Daft Punk", "starboy_weeknd"},
-    {"Pop Global", "Faded", "Alan Walker", "faded_alan_walker"},
-    {"Pop Global", "Shape of You", "Ed Sheeran", "shape_of_you"},
-
-    // 6. Chill & Lofi Santai
-    {"Chill & Lofi", "Lofi Rain Beats", "Lofi Girl", "lofi_rain_beats"},
-    {"Chill & Lofi", "Sunset Drive Vibes", "Chillhop Music", "sunset_drive_lofi"},
-    {"Chill & Lofi", "Acoustic Cafe Morning", "Coffee Vibes", "acoustic_cafe"}
+enum E_BBMUSIC_TRACK {
+    bm_ID[32],
+    bm_Title[48],
+    bm_Artist[32],
+    bm_Duration[12]
 };
 
 // Struktur Data Lagu Realtime dari Web
-enum E_WEB_TRACK {
-    wt_ID[32],
-    wt_Title[48],
-    wt_Artist[32],
-    wt_Duration[12]
-};
-
-static g_WebTracks[MAX_BBMUSIC_WEB_TRACKS][E_WEB_TRACK];
+static g_WebTracks[MAX_BBMUSIC_WEB_TRACKS][E_BBMUSIC_TRACK];
 static g_WebTrackCount = 0;
+
+// Struktur Data Lagu Offline yang Disimpan di Hosting (scriptfiles/bbmusic_offline.txt)
+static g_OfflineTracks[MAX_BBMUSIC_OFFLINE_TRACKS][E_BBMUSIC_TRACK];
+static g_OfflineTrackCount = 0;
+
+// 10 Lagu Default berkualitas jika web offline saat download perdana
+new const g_DefaultOfflineTracks[10][E_BBMUSIC_TRACK] = {
+    {"461800b227", "Bergema Sampai Selamanya", "Nadhif Basalamah", "3:45"},
+    {"9941e16205", "Rasa Ini (Thai Edit)", "Vierra ft 0landrys", "3:12"},
+    {"f47889dec4", "Astaga Bercanda (Thai Edit)", "Akbar Chalay & Mingse", "2:55"},
+    {"50941873dd", "Gone, Gone, Gone", "Phillip Phillips", "3:28"},
+    {"3cde51f0e9", "What If I Call", "Alex Crichton", "2:40"},
+    {"rick_astley", "Never Gonna Give You Up", "Rick Astley", "3:32"},
+    {"starboy_weeknd", "Starboy", "The Weeknd ft Daft Punk", "3:50"},
+    {"nemen_koplo", "Nemen", "Gildcoustic", "4:10"},
+    {"rungkad_koplo", "Rungkad", "Happy Asmara", "3:58"},
+    {"lofi_rain_beats", "Lofi Rain Beats", "Lofi Girl", "2:30"}
+};
 
 // Data Boombox per Player
 enum E_BOOMBOX_DATA {
@@ -126,8 +112,7 @@ enum E_BOOMBOX_DATA {
     bb_ObjectID,
     Text3D:bb_LabelID,
     bb_TrackTitle[64],
-    bb_StreamUrl[128],
-    bb_SelectedCat[24]
+    bb_StreamUrl[128]
 };
 
 static g_PlayerBoombox[MAX_PLAYERS][E_BOOMBOX_DATA];
@@ -141,6 +126,7 @@ forward OnBoomboxStop(playerid);
 forward OnBoomboxPickup(playerid);
 forward BBMusic_SyncListeners();
 forward OnBBMusicHttpSync(index, response_code, const data[]);
+forward OnBBMusicDownloadOffline(index, response_code, const data[]);
 
 // ================= FUNGSI HELPER URL =================
 stock BBMusic_FormatStreamUrl(const input[], output[], maxlen = sizeof(output)) {
@@ -180,15 +166,15 @@ stock BBMusic_ParseWebTracks(const data[]) {
                 if (p2 != -1) {
                     new p3 = strfind(line, "|", false, p2 + 1);
 
-                    strmid(g_WebTracks[g_WebTrackCount][wt_ID], line, 0, p1, 32);
-                    strmid(g_WebTracks[g_WebTrackCount][wt_Title], line, p1 + 1, p2, 48);
+                    strmid(g_WebTracks[g_WebTrackCount][bm_ID], line, 0, p1, 32);
+                    strmid(g_WebTracks[g_WebTrackCount][bm_Title], line, p1 + 1, p2, 48);
 
                     if (p3 != -1) {
-                        strmid(g_WebTracks[g_WebTrackCount][wt_Artist], line, p2 + 1, p3, 32);
-                        strmid(g_WebTracks[g_WebTrackCount][wt_Duration], line, p3 + 1, copyLen, 12);
+                        strmid(g_WebTracks[g_WebTrackCount][bm_Artist], line, p2 + 1, p3, 32);
+                        strmid(g_WebTracks[g_WebTrackCount][bm_Duration], line, p3 + 1, copyLen, 12);
                     } else {
-                        strmid(g_WebTracks[g_WebTrackCount][wt_Artist], line, p2 + 1, copyLen, 32);
-                        format(g_WebTracks[g_WebTrackCount][wt_Duration], 12, "N/A");
+                        strmid(g_WebTracks[g_WebTrackCount][bm_Artist], line, p2 + 1, copyLen, 32);
+                        format(g_WebTracks[g_WebTrackCount][bm_Duration], 12, "N/A");
                     }
                     g_WebTrackCount++;
                 }
@@ -226,8 +212,192 @@ public OnBBMusicHttpSync(index, response_code, const data[]) {
     } else {
         printf("[BBMusic] Gagal sinkronisasi lagu dari web (HTTP Code: %d)", response_code);
         if (index != -1 && IsPlayerConnected(index)) {
-            SendClientMessage(index, 0xFF6347AA, "[BBMusic] Gagal menghubungi web bbmusic.biz.id. Membuka library offline...");
-            BBMusic_ShowCategories(index);
+            SendClientMessage(index, 0xFF6347AA, "[BBMusic] Gagal menghubungi web bbmusic.biz.id. Membuka library offline hosting...");
+            BBMusic_ShowOfflineLibrary(index);
+        }
+    }
+    return 1;
+}
+
+// ================= SISTEM LIBRARY OFFLINE HOSTING =================
+
+// Menyimpan data string lagu ke file scriptfiles/bbmusic_offline.txt
+stock BBMusic_SaveOfflineTracks(const data[]) {
+    new File:handle = fopen(BBMUSIC_OFFLINE_FILE, io_write);
+    if (!handle) {
+        printf("[BBMusic Error] Gagal membuat file scriptfiles/%s! Pastikan folder scriptfiles ada.", BBMUSIC_OFFLINE_FILE);
+        return 0;
+    }
+
+    new len = strlen(data);
+    new lineStart = 0;
+    new lineEnd = 0;
+    new count = 0;
+
+    while (lineStart < len && count < MAX_BBMUSIC_OFFLINE_TRACKS) {
+        lineEnd = lineStart;
+        while (lineEnd < len && data[lineEnd] != '\n' && data[lineEnd] != '\r') {
+            lineEnd++;
+        }
+
+        if (lineEnd > lineStart) {
+            new line[160];
+            new copyLen = lineEnd - lineStart;
+            if (copyLen > 150) copyLen = 150;
+            strmid(line, data, lineStart, lineStart + copyLen, sizeof(line));
+
+            // Pastikan baris memiliki pemisah pipa |
+            if (strfind(line, "|", false) != -1) {
+                format(line, sizeof(line), "%s\r\n", line);
+                fwrite(handle, line);
+                count++;
+            }
+        }
+
+        lineStart = lineEnd + 1;
+        while (lineStart < len && (data[lineStart] == '\n' || data[lineStart] == '\r')) {
+            lineStart++;
+        }
+    }
+
+    // Jika lagu dari web kurang dari 10, lengkapi dari default agar pas 10 lagu
+    if (count < MAX_BBMUSIC_OFFLINE_TRACKS) {
+        for (new i = 0; i < sizeof(g_DefaultOfflineTracks) && count < MAX_BBMUSIC_OFFLINE_TRACKS; i++) {
+            new line[160];
+            format(line, sizeof(line), "%s|%s|%s|%s\r\n",
+                g_DefaultOfflineTracks[i][bm_ID],
+                g_DefaultOfflineTracks[i][bm_Title],
+                g_DefaultOfflineTracks[i][bm_Artist],
+                g_DefaultOfflineTracks[i][bm_Duration]
+            );
+            fwrite(handle, line);
+            count++;
+        }
+    }
+
+    fclose(handle);
+    return count;
+}
+
+// Menulis 10 lagu default ke hosting jika server offline saat download awal
+stock BBMusic_WriteDefaultOffline() {
+    new File:handle = fopen(BBMUSIC_OFFLINE_FILE, io_write);
+    if (!handle) {
+        printf("[BBMusic Error] Gagal menulis file default scriptfiles/%s!", BBMUSIC_OFFLINE_FILE);
+        return 0;
+    }
+
+    for (new i = 0; i < sizeof(g_DefaultOfflineTracks); i++) {
+        new line[160];
+        format(line, sizeof(line), "%s|%s|%s|%s\r\n",
+            g_DefaultOfflineTracks[i][bm_ID],
+            g_DefaultOfflineTracks[i][bm_Title],
+            g_DefaultOfflineTracks[i][bm_Artist],
+            g_DefaultOfflineTracks[i][bm_Duration]
+        );
+        fwrite(handle, line);
+    }
+
+    fclose(handle);
+    return sizeof(g_DefaultOfflineTracks);
+}
+
+// Membaca lagu dari scriptfiles/bbmusic_offline.txt ke memori
+stock BBMusic_LoadOfflineTracks() {
+    g_OfflineTrackCount = 0;
+    if (!fexist(BBMUSIC_OFFLINE_FILE)) {
+        return 0;
+    }
+
+    new File:handle = fopen(BBMUSIC_OFFLINE_FILE, io_read);
+    if (!handle) return 0;
+
+    new line[160];
+    while (g_OfflineTrackCount < MAX_BBMUSIC_OFFLINE_TRACKS && fread(handle, line)) {
+        new lineLen = strlen(line);
+        while (lineLen > 0 && (line[lineLen - 1] == '\r' || line[lineLen - 1] == '\n' || line[lineLen - 1] == ' ')) {
+            line[--lineLen] = '\0';
+        }
+        if (lineLen < 3) continue;
+
+        new p1 = strfind(line, "|", false);
+        if (p1 != -1) {
+            new p2 = strfind(line, "|", false, p1 + 1);
+            if (p2 != -1) {
+                new p3 = strfind(line, "|", false, p2 + 1);
+
+                strmid(g_OfflineTracks[g_OfflineTrackCount][bm_ID], line, 0, p1, 32);
+                strmid(g_OfflineTracks[g_OfflineTrackCount][bm_Title], line, p1 + 1, p2, 48);
+
+                if (p3 != -1) {
+                    strmid(g_OfflineTracks[g_OfflineTrackCount][bm_Artist], line, p2 + 1, p3, 32);
+                    strmid(g_OfflineTracks[g_OfflineTrackCount][bm_Duration], line, p3 + 1, lineLen, 12);
+                } else {
+                    strmid(g_OfflineTracks[g_OfflineTrackCount][bm_Artist], line, p2 + 1, lineLen, 32);
+                    format(g_OfflineTracks[g_OfflineTrackCount][bm_Duration], 12, "N/A");
+                }
+                g_OfflineTrackCount++;
+            }
+        }
+    }
+
+    fclose(handle);
+    return g_OfflineTrackCount;
+}
+
+// Inisialisasi: Cek file di hosting. Jika tidak ada -> Otomatis download 10 lagu dari web
+stock BBMusic_InitOfflineLibrary(playerid = -1) {
+    if (fexist(BBMUSIC_OFFLINE_FILE)) {
+        new count = BBMusic_LoadOfflineTracks();
+        printf("[BBMusic] File %s ditemukan di hosting. Memuat %d lagu library offline.", BBMUSIC_OFFLINE_FILE, count);
+        if (playerid != -1 && IsPlayerConnected(playerid)) {
+            new msg[128];
+            format(msg, sizeof(msg), "{00FF7F}[BBMusic] Berhasil memuat {FFFF00}%d lagu offline {00FF7F}dari hosting!", count);
+            SendClientMessage(playerid, 0x00FF7FAA, msg);
+        }
+        return count;
+    }
+
+    // File tidak ditemukan di hosting -> Download otomatis 10 lagu dari web bbmusic.biz.id
+    printf("[BBMusic] File %s belum ada di hosting! Otomatis mendownload 10 lagu dari web bbmusic.biz.id...", BBMUSIC_OFFLINE_FILE);
+    if (playerid != -1 && IsPlayerConnected(playerid)) {
+        SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] File library offline belum ada di hosting. Mengunduh 10 lagu dari web...");
+    }
+
+    HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
+    return 1;
+}
+
+// Download ulang / paksa perbarui 10 lagu offline dari web
+stock BBMusic_DownloadOffline(playerid = -1) {
+    printf("[BBMusic] Mengunduh ulang 10 lagu dari bbmusic.biz.id ke hosting (scriptfiles/%s)...", BBMUSIC_OFFLINE_FILE);
+    if (playerid != -1 && IsPlayerConnected(playerid)) {
+        SendClientMessage(playerid, 0x00BFFFAA, "[BBMusic] Mengunduh 10 lagu offline dari web untuk disimpan di hosting...");
+    }
+    HTTP(playerid, HTTP_GET, BBMUSIC_API_OFFLINE_HOST, "", "OnBBMusicDownloadOffline");
+    return 1;
+}
+
+// Callback respon HTTP saat mengunduh 10 lagu offline
+public OnBBMusicDownloadOffline(index, response_code, const data[]) {
+    if (response_code == 200 && strlen(data) > 5) {
+        new count = BBMusic_SaveOfflineTracks(data);
+        BBMusic_LoadOfflineTracks();
+        printf("[BBMusic] SUKSES! %d lagu dari web berhasil disimpan di hosting (scriptfiles/%s) sebagai library offline.", count, BBMUSIC_OFFLINE_FILE);
+        if (index != -1 && IsPlayerConnected(index)) {
+            new msg[144];
+            format(msg, sizeof(msg), "{00FF7F}[BBMusic] Sukses mendownload & menyimpan {FFFF00}%d lagu {00FF7F}ke hosting untuk library offline!", count);
+            SendClientMessage(index, 0x00FF7FAA, msg);
+            BBMusic_ShowOfflineLibrary(index);
+        }
+    } else {
+        printf("[BBMusic] Gagal mengunduh dari web (HTTP %d). Menulis 10 lagu default ke hosting...", response_code);
+        new count = BBMusic_WriteDefaultOffline();
+        BBMusic_LoadOfflineTracks();
+        printf("[BBMusic] %d lagu default berhasil disimpan di hosting (scriptfiles/%s).", count, BBMUSIC_OFFLINE_FILE);
+        if (index != -1 && IsPlayerConnected(index)) {
+            SendClientMessage(index, 0xFFA500AA, "[BBMusic] Gagal download dari web, menggunakan 10 lagu offline default di hosting.");
+            BBMusic_ShowOfflineLibrary(index);
         }
     }
     return 1;
@@ -448,11 +618,11 @@ stock Boombox_ShowMenu(playerid) {
         format(mainDialog, sizeof(mainDialog), 
             "{00FF7F}1. [PASANG] Letakkan Boombox di Tanah\n\
             {AAAAAA}2. [WEB] Lagu Terbaru dari Website (%d Lagu Tersinkron)\n\
-            {AAAAAA}3. [OFFLINE] Library Lagu Bawaan Server\n\
+            {AAAAAA}3. [OFFLINE] Library Lagu Offline Hosting (%d Lagu Tersimpan)\n\
             {AAAAAA}4. [CUSTOM] Input Track ID / Link Sendiri\n\
             {00BFFF}5. [SYNC] Sinkronisasi Ulang dari Web bbmusic.biz.id\n\
             {AAAAAA}6. [TUTUP] Tutup Menu",
-            g_WebTrackCount
+            g_WebTrackCount, g_OfflineTrackCount
         );
         ShowPlayerDialog(playerid, DIALOG_BBMUSIC_MAIN, DIALOG_STYLE_LIST, "{00BFFF}BBMusic {FFFFFF}- Menu Boombox", mainDialog, "Pilih", "Batal");
     } else {
@@ -466,13 +636,13 @@ stock Boombox_ShowMenu(playerid) {
         format(mainDialog, sizeof(mainDialog), 
             "{FF6347}1. [AMBIL] Ambil Kembali Boombox (Pickup)\n\
             {00FF7F}2. [WEB] Lagu Terbaru dari Website ({FFFF00}%d Lagu{00FF7F})\n\
-            {00BFFF}3. [OFFLINE] Library Lagu Bawaan Server\n\
+            {00BFFF}3. [OFFLINE] Library Lagu Offline Hosting ({FFFF00}%d Lagu{00BFFF})\n\
             {00FFFF}4. [CUSTOM] Input Track ID / Link Custom\n\
             {FFD700}5. [SYNC] Sinkronisasi / Tarik Lagu Terbaru dari Web\n\
             {FFFF00}6. [RADIUS] Atur Jarak Suara (Saat ini: %.0fm)\n\
             {FF4500}7. [STOP] Hentikan Musik (%s)\n\
             {FFFFFF}8. [TUTUP] Tutup Menu",
-            g_WebTrackCount, g_PlayerBoombox[playerid][bb_Distance], statusStr
+            g_WebTrackCount, g_OfflineTrackCount, g_PlayerBoombox[playerid][bb_Distance], statusStr
         );
         ShowPlayerDialog(playerid, DIALOG_BBMUSIC_MAIN, DIALOG_STYLE_LIST, "{00BFFF}BBMusic {FFFFFF}- Menu Kontrol Boombox", mainDialog, "Pilih", "Batal");
     }
@@ -491,7 +661,7 @@ stock BBMusic_ShowWebLibrary(playerid) {
     for (new i = 0; i < g_WebTrackCount; i++) {
         if (i > 0) strcat(songList, "\n");
         new line[128];
-        format(line, sizeof(line), "{FFFFFF}%d. {00FF7F}%s {AAAAAA}- %s {00FFFF}[%s]", i + 1, g_WebTracks[i][wt_Title], g_WebTracks[i][wt_Artist], g_WebTracks[i][wt_Duration]);
+        format(line, sizeof(line), "{FFFFFF}%d. {00FF7F}%s {AAAAAA}- %s {00FFFF}[%s]", i + 1, g_WebTracks[i][bm_Title], g_WebTracks[i][bm_Artist], g_WebTracks[i][bm_Duration]);
         strcat(songList, line);
     }
 
@@ -501,56 +671,71 @@ stock BBMusic_ShowWebLibrary(playerid) {
     return 1;
 }
 
-// Dialog kategori offline library
-stock BBMusic_ShowCategories(playerid) {
-    new catList[512];
-    format(catList, sizeof(catList), 
-        "1. [POP] Pop & Galau Indonesia\n\
-        2. [REMIX] DJ Remix & Thai Edit (Jedag-Jedug)\n\
-        3. [KOPLO] Dangdut & Koplo Jawa\n\
-        4. [PHONK] Phonk & Drift Vibes\n\
-        5. [WESTERN] Pop Global / Hits Barat\n\
-        6. [CHILL] Chill, Lofi & Acoustic"
-    );
-    ShowPlayerDialog(playerid, DIALOG_BBMUSIC_CATEGORIES, DIALOG_STYLE_LIST, "{00BFFF}BBMusic {FFFFFF}- Kategori Offline", catList, "Buka", "Kembali");
-    return 1;
-}
+// Dialog daftar lagu offline yang tersimpan di hosting (scriptfiles/bbmusic_offline.txt)
+stock BBMusic_ShowOfflineLibrary(playerid) {
+    if (!IsPlayerConnected(playerid)) return 0;
 
-// Dialog daftar lagu offline per kategori
-stock BBMusic_ShowOfflineSongs(playerid, const category[]) {
-    format(g_PlayerBoombox[playerid][bb_SelectedCat], 24, "%s", category);
-    new songList[1024];
-    new count = 0;
-
-    for (new i = 0; i < sizeof(g_BBMusicOfflineLibrary); i++) {
-        if (strcmp(g_BBMusicOfflineLibrary[i][E_SONG_CATEGORY], category, true) == 0) {
-            if (count > 0) strcat(songList, "\n");
-            new line[128];
-            format(line, sizeof(line), "{FFFFFF}%s {AAAAAA}- %s", g_BBMusicOfflineLibrary[i][E_SONG_TITLE], g_BBMusicOfflineLibrary[i][E_SONG_ARTIST]);
-            strcat(songList, line);
-            count++;
+    if (g_OfflineTrackCount == 0) {
+        if (!fexist(BBMUSIC_OFFLINE_FILE)) {
+            BBMusic_InitOfflineLibrary(playerid);
+            return 1;
+        } else {
+            BBMusic_LoadOfflineTracks();
         }
     }
 
-    if (count == 0) {
-        SendClientMessage(playerid, 0xFFA500AA, "[BBMusic] Belum ada lagu pada kategori ini.");
-        return BBMusic_ShowCategories(playerid);
+    new songList[2048];
+    for (new i = 0; i < g_OfflineTrackCount; i++) {
+        if (i > 0) strcat(songList, "\n");
+        new line[128];
+        format(line, sizeof(line), "{FFFFFF}%d. {00FF7F}%s {AAAAAA}- %s {00FFFF}[%s]", 
+            i + 1, g_OfflineTracks[i][bm_Title], g_OfflineTracks[i][bm_Artist], g_OfflineTracks[i][bm_Duration]
+        );
+        strcat(songList, line);
     }
 
     new header[64];
-    format(header, sizeof(header), "{00BFFF}Offline: {FFFFFF}%s", category);
+    format(header, sizeof(header), "{00BFFF}BBMusic Offline: {FFFFFF}%d Lagu di Hosting", g_OfflineTrackCount);
     ShowPlayerDialog(playerid, DIALOG_BBMUSIC_OFFLINE_SONGS, DIALOG_STYLE_LIST, header, songList, "Putar", "Kembali");
     return 1;
 }
 
 // ================= ALS CALLBACK HOOKS =================
 
-// Hook Init
+// Hook Init untuk Filterscript & Gamemode
+#if defined FILTERSCRIPT
+public OnFilterScriptInit() {
+    if (g_BBMusicSyncTimer == -1) {
+        g_BBMusicSyncTimer = SetTimer("BBMusic_SyncListeners", 2000, true);
+    }
+    // Cek file offline di hosting, jika belum ada otomatis download 10 lagu dari web
+    BBMusic_InitOfflineLibrary();
+    // Auto-sync awal dengan web
+    BBMusic_SyncWithWeb(-1);
+
+    #if defined BBMusic_OnFilterScriptInit
+        return BBMusic_OnFilterScriptInit();
+    #else
+        return 1;
+    #endif
+}
+#if defined _ALS_OnFilterScriptInit
+    #undef OnFilterScriptInit
+#else
+    #define _ALS_OnFilterScriptInit
+#endif
+#define OnFilterScriptInit BBMusic_OnFilterScriptInit
+#if defined BBMusic_OnFilterScriptInit
+    forward BBMusic_OnFilterScriptInit();
+#endif
+#else
 public OnGameModeInit() {
     if (g_BBMusicSyncTimer == -1) {
         g_BBMusicSyncTimer = SetTimer("BBMusic_SyncListeners", 2000, true);
     }
-    // Auto-sync awal dengan web saat server pertama kali start
+    // Cek file offline di hosting, jika belum ada otomatis download 10 lagu dari web
+    BBMusic_InitOfflineLibrary();
+    // Auto-sync awal dengan web
     BBMusic_SyncWithWeb(-1);
 
     #if defined BBMusic_OnGameModeInit
@@ -567,6 +752,7 @@ public OnGameModeInit() {
 #define OnGameModeInit BBMusic_OnGameModeInit
 #if defined BBMusic_OnGameModeInit
     forward BBMusic_OnGameModeInit();
+#endif
 #endif
 
 // Hook Disconnect (Auto Pickup)
@@ -614,7 +800,7 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[]) {
                 switch (listitem) {
                     case 0: Boombox_Pickup(playerid);
                     case 1: BBMusic_ShowWebLibrary(playerid);
-                    case 2: BBMusic_ShowCategories(playerid);
+                    case 2: BBMusic_ShowOfflineLibrary(playerid);
                     case 3: ShowPlayerDialog(playerid, DIALOG_BBMUSIC_CUSTOM, DIALOG_STYLE_INPUT, "{00BFFF}BBMusic {FFFFFF}- Input ID / Link Musik", "{FFFFFF}Masukkan {00FF7F}Track ID {FFFFFF}dari web (contoh: {FFFF00}9941e16205{FFFFFF})\natau URL direct stream MP3:\n\n{AAAAAA}Tips: Dapatkan ID lagu gratis di https://bbmusic.biz.id", "Putar", "Kembali");
                     case 4: BBMusic_SyncWithWeb(playerid);
                     case 5: ShowPlayerDialog(playerid, DIALOG_BBMUSIC_RADIUS, DIALOG_STYLE_INPUT, "{00BFFF}BBMusic {FFFFFF}- Atur Radius Suara", "{FFFFFF}Masukkan radius jangkauan suara (meter):\n{AAAAAA}Nilai yang diperbolehkan: 10 - 75 meter\nDefault: 35 meter", "Simpan", "Kembali");
@@ -629,46 +815,21 @@ public OnDialogResponse(playerid, dialogid, response, listitem, inputtext[]) {
             if (!response) return Boombox_ShowMenu(playerid);
             if (listitem >= 0 && listitem < g_WebTrackCount) {
                 new fullTitle[64];
-                format(fullTitle, sizeof(fullTitle), "%s - %s", g_WebTracks[listitem][wt_Artist], g_WebTracks[listitem][wt_Title]);
-                Boombox_Play(playerid, g_WebTracks[listitem][wt_ID], fullTitle, g_PlayerBoombox[playerid][bb_Distance]);
-            }
-            return 1;
-        }
-
-        case DIALOG_BBMUSIC_CATEGORIES: {
-            if (!response) return Boombox_ShowMenu(playerid);
-
-            switch (listitem) {
-                case 0: BBMusic_ShowOfflineSongs(playerid, "Pop Indo");
-                case 1: BBMusic_ShowOfflineSongs(playerid, "DJ Remix");
-                case 2: BBMusic_ShowOfflineSongs(playerid, "Dangdut Koplo");
-                case 3: BBMusic_ShowOfflineSongs(playerid, "Phonk & Drift");
-                case 4: BBMusic_ShowOfflineSongs(playerid, "Pop Global");
-                case 5: BBMusic_ShowOfflineSongs(playerid, "Chill & Lofi");
+                format(fullTitle, sizeof(fullTitle), "%s - %s", g_WebTracks[listitem][bm_Artist], g_WebTracks[listitem][bm_Title]);
+                Boombox_Play(playerid, g_WebTracks[listitem][bm_ID], fullTitle, g_PlayerBoombox[playerid][bb_Distance]);
             }
             return 1;
         }
 
         case DIALOG_BBMUSIC_OFFLINE_SONGS: {
-            if (!response) return BBMusic_ShowCategories(playerid);
-
-            new selectedIndex = -1;
-            new matchCounter = 0;
-
-            for (new i = 0; i < sizeof(g_BBMusicOfflineLibrary); i++) {
-                if (strcmp(g_BBMusicOfflineLibrary[i][E_SONG_CATEGORY], g_PlayerBoombox[playerid][bb_SelectedCat], true) == 0) {
-                    if (matchCounter == listitem) {
-                        selectedIndex = i;
-                        break;
-                    }
-                    matchCounter++;
-                }
-            }
-
-            if (selectedIndex != -1) {
+            if (!response) return Boombox_ShowMenu(playerid);
+            if (listitem >= 0 && listitem < g_OfflineTrackCount) {
                 new fullTitle[64];
-                format(fullTitle, sizeof(fullTitle), "%s - %s", g_BBMusicOfflineLibrary[selectedIndex][E_SONG_ARTIST], g_BBMusicOfflineLibrary[selectedIndex][E_SONG_TITLE]);
-                Boombox_Play(playerid, g_BBMusicOfflineLibrary[selectedIndex][E_SONG_ID], fullTitle, g_PlayerBoombox[playerid][bb_Distance]);
+                format(fullTitle, sizeof(fullTitle), "%s - %s", g_OfflineTracks[listitem][bm_Artist], g_OfflineTracks[listitem][bm_Title]);
+                Boombox_Play(playerid, g_OfflineTracks[listitem][bm_ID], fullTitle, g_PlayerBoombox[playerid][bb_Distance]);
+                new msg[128];
+                format(msg, sizeof(msg), "{00FF7F}[BBMusic] Memutar lagu dari offline library hosting: {FFFF00}%s", fullTitle);
+                SendClientMessage(playerid, 0x00FF7FAA, msg);
             }
             return 1;
         }
